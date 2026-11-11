@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+defaults:
+  run:
+    working-directory: ReactJs-Final-Project
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ReactJs-Final-Project/package-lock.json
+      - run: npm ci
+      - run: npm test -- --run
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: ReactJs-Final-Project/dist
