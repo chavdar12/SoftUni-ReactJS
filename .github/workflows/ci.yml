@@ -6,23 +6,19 @@ on:
   pull_request:
     branches: [main, dev]
 
-defaults:
-  run:
-    working-directory: ReactJs-Final-Project
-
 jobs:
   client:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ReactJs-Final-Project/client
+        working-directory: client
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: ReactJs-Final-Project/client/package-lock.json
+          cache-dependency-path: client/package-lock.json
       - run: npm ci
       - run: npm test -- --run
       - run: npm run build
@@ -31,14 +27,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ReactJs-Final-Project/server
+        working-directory: server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: ReactJs-Final-Project/server/package-lock.json
+          cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
@@ -73,7 +69,7 @@ jobs:
           kubectl -n hms port-forward svc/gateway 8080:8080 &
           sleep 3
       - run: npm ci && npx playwright install --with-deps chromium && npx playwright test
-        working-directory: ReactJs-Final-Project/e2e
+        working-directory: e2e
       - name: Load test
         run: |
           kubectl -n hms run k6 --rm -i --restart=Never --image=grafana/k6:1.4.0 \
