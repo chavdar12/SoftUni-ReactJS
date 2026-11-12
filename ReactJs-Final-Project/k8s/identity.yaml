@@ -53,6 +53,9 @@ spec:
             - {name: OTEL_EXPORTER_PROMETHEUS_HOST, value: 0.0.0.0}  # default is localhost: Prometheus couldn't reach it
             - {name: OTEL_LOGS_EXPORTER, value: none}
             - {name: OTEL_SEMCONV_STABILITY_OPT_IN, value: http}
+            - {name: SMTP_URL, value: "smtp://maildev:1025"}  # test inbox; point at a real SMTP server in production
+            - {name: APP_URL, value: "http://localhost:8080"}  # reset links + passkey origin
+            - {name: RP_ID, value: localhost}
             - {name: ADMIN_EMAIL, valueFrom: {secretKeyRef: {name: hms-secrets, key: ADMIN_EMAIL, optional: true}}}
             - {name: ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: hms-secrets, key: ADMIN_PASSWORD, optional: true}}}
           # CPU request is what the HPA percentage is measured against. No CPU limit: throttling hurts latency.

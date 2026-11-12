@@ -1,4 +1,4 @@
-import {startService} from '../../shared/src/server.ts';
+import {startService} from '#shared/server.ts';
 import {routes} from './routes.ts';
 import {seedAdmin} from './lib/seedAdmin.ts';
 

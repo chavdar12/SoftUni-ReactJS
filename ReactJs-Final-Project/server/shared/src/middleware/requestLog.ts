@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import type {NextFunction, Request, Response} from 'express';
 import {trace} from '@opentelemetry/api';
-import {logger} from '../lib/logger.ts';
+import {logger} from '#shared/lib/logger.ts';
 
 /** One log line per request. Reuses nginx's X-Request-ID so a request can be traced across services. */
 export function requestLog(req: Request, res: Response, next: NextFunction) {

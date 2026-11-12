@@ -1,18 +1,20 @@
 import {Link, Navigate} from 'react-router';
 import {Button, Link as MuiLink, Stack, TextField} from '@mui/material';
 import {z} from 'zod';
-import {useAuth} from '../../auth/useAuth';
-import {homeFor} from '../../auth/RequireRole';
-import {useSignup} from '../../api/hooks';
-import useZodForm from '../../useZodForm';
-import AuthCard from '../../components/AuthCard';
-import FormStatus from '../../components/FormStatus';
+import {useAuth} from '@/auth/useAuth';
+import {homeFor} from '@/auth/RequireRole';
+import {useSignup} from '@/api/hooks';
+import useZodForm from '@/useZodForm';
+import AuthCard from '@/components/AuthCard';
+import FormStatus from '@/components/FormStatus';
+import PhoneField from '@/components/PhoneField';
+import {E164} from '@/lib/phone';
 
 const schema = z
     .object({
         name: z.string().trim().min(1, 'Required'),
         email: z.email('Enter a valid email'),
-        phone: z.string().trim().min(6, 'At least 6 digits'),
+        phone: z.string('Enter your phone number').regex(E164, 'Enter a valid phone number'),
         password: z.string().min(6, 'At least 6 characters'),
         confirm: z.string(),
     })
@@ -21,7 +23,7 @@ const schema = z
 export default function Signup() {
     const {profile} = useAuth();
     const signup = useSignup();
-    const {handleSubmit, field} = useZodForm(schema);
+    const {handleSubmit, field, setValue, formState} = useZodForm(schema);
 
     if (profile) return <Navigate to={homeFor(profile.role)} replace/>;
 
@@ -36,7 +38,11 @@ export default function Signup() {
                 <FormStatus error={signup.error?.message}/>
                 <TextField label="Full name" autoComplete="name" required autoFocus {...field('name')}/>
                 <TextField label="Email" type="email" autoComplete="email" required {...field('email')}/>
-                <TextField label="Phone" type="tel" autoComplete="tel" required {...field('phone')}/>
+                <PhoneField
+                    required
+                    onChange={(v) => setValue('phone', v, {shouldValidate: formState.isSubmitted})}
+                    error={formState.errors.phone?.message}
+                />
                 <TextField label="Password" type="password" autoComplete="new-password" required {...field('password')}/>
                 <TextField label="Confirm password" type="password" autoComplete="new-password" required {...field('confirm')}/>
                 <Button type="submit" variant="contained" disabled={signup.isPending}>

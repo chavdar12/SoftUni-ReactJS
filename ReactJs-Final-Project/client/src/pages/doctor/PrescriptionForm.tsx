@@ -1,9 +1,9 @@
 import {Button, Stack, TextField} from '@mui/material';
 import {z} from 'zod';
-import {usePrescribe} from '../../api/hooks';
-import type {Appointment} from '../../api/types';
-import useZodForm from '../../useZodForm';
-import FormStatus from '../../components/FormStatus';
+import {usePrescribe} from '@/api/hooks';
+import type {Appointment} from '@/api/types';
+import useZodForm from '@/useZodForm';
+import FormStatus from '@/components/FormStatus';
 
 const schema = z.object({
     disease: z.string().trim().min(1, 'Required'),

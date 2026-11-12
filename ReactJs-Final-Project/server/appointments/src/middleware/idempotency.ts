@@ -1,7 +1,7 @@
 import type {NextFunction, Request, Response} from 'express';
-import {redis} from '../../../shared/src/lib/redis.ts';
-import {HttpError} from '../../../shared/src/lib/HttpError.ts';
-import {logger} from '../../../shared/src/lib/logger.ts';
+import {redis} from '#shared/lib/redis.ts';
+import {HttpError} from '#shared/lib/HttpError.ts';
+import {logger} from '#shared/lib/logger.ts';
 
 const TTL_SECONDS = 24 * 3600;
 

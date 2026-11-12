@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - mongo.yaml
   - redis.yaml
+  - maildev.yaml
   - identity.yaml
   - appointments.yaml
   - gateway.yaml

@@ -4,7 +4,7 @@ const run = Date.now().toString(36);
 
 async function signUp(request: import('@playwright/test').APIRequestContext, tag: string) {
     const res = await request.post('/api/auth/signup', {
-        data: {name: `API ${tag}`, email: `${tag}-${run}@e2e.test`, phone: '0888000000', password: 'secret123'},
+        data: {name: `API ${tag}`, email: `${tag}-${run}@e2e.test`, phone: '+359888000000', password: 'secret123'},
     });
     expect(res.status()).toBe(201);
     return (await res.json()).accessToken as string;

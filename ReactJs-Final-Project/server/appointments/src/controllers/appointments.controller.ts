@@ -1,65 +1,71 @@
 import type {Request, Response} from 'express';
-import type {z} from 'zod';
-import {Appointment} from '../models/Appointment.ts';
-import {getDoctor} from '../lib/identityClient.ts';
-import {HttpError} from '../../../shared/src/lib/HttpError.ts';
-import type {AuthUser} from '../../../shared/src/lib/jwt.ts';
-import type {bookBody, prescribeBody} from '../schemas.ts';
+import * as appointments from '#appointments/services/appointments.service.ts';
+import type {Caller} from '#appointments/lib/identityClient.ts';
+import type {
+    AvailabilityQueryDto,
+    BookDto,
+    CancelDto,
+    ListQueryDto,
+    PageDto,
+    PrescribeDto,
+    RateDto,
+    RefillDecisionDto,
+    RescheduleDto,
+} from '#appointments/dto/appointment.dto.ts';
 
-/** Admins see everything; doctors and patients only their own. */
-const ownedBy = (u: AuthUser) =>
-    u.role === 'admin' ? {} : u.role === 'doctor' ? {doctorId: u.id} : {patientId: u.id};
+// HTTP only: inputs arrive validated (validate middleware + DTO schemas); the services hold the rules.
+
+const id = (req: Request) => String(req.params.id);
+const query = (req: Request) => req.query as unknown as ListQueryDto;
+const caller = (req: Request, res: Response): Caller => ({authorization: req.get('Authorization') ?? '', reqId: res.locals.reqId});
+
+/** The body stays a plain array; the total goes in X-Total-Count. */
+const sendPage = <T>(res: Response, {items, total}: PageDto<T>) => res.set('X-Total-Count', String(total)).json(items);
 
 export async function list(req: Request, res: Response) {
-    res.json(await Appointment.find(ownedBy(req.user)).sort('-date'));
+    sendPage(res, await appointments.list(req.user, query(req)));
+}
+
+export async function availability(req: Request, res: Response) {
+    res.json(await appointments.availability(caller(req, res), req.query as unknown as AvailabilityQueryDto));
 }
 
 export async function book(req: Request, res: Response) {
-    const {doctorId, date} = req.body as z.infer<typeof bookBody>;
-    const doctor = await getDoctor(req, doctorId);
-    const appointment = await Appointment.create({
-        patientId: req.user.id,
-        patientName: req.user.name,
-        doctorId: doctor.id,
-        doctorName: doctor.name,
-        specialization: doctor.specialization,
-        roomNumber: doctor.roomNumber,
-        date,
-    });
-    res.status(201).json(appointment);
+    res.status(201).json(await appointments.book(req.user, caller(req, res), req.body as BookDto));
 }
 
 export async function cancel(req: Request, res: Response) {
-    const appointment = await Appointment.findOneAndUpdate(
-        {_id: req.params.id, status: 'active', ...ownedBy(req.user)},
-        {status: 'cancelled', closedBy: req.user.name},
-        {returnDocument: 'after'},
-    );
-    if (!appointment) throw new HttpError(404, 'No active appointment found');
-    res.json(appointment);
+    res.json(await appointments.cancel(req.user, id(req), req.body as CancelDto));
+}
+
+export async function reschedule(req: Request, res: Response) {
+    res.json(await appointments.reschedule(req.user, caller(req, res), id(req), req.body as RescheduleDto));
 }
 
 export async function prescribe(req: Request, res: Response) {
-    const prescription = req.body as z.infer<typeof prescribeBody>;
-    const appointment = await Appointment.findOneAndUpdate(
-        {_id: req.params.id, status: 'active', doctorId: req.user.id},
-        {status: 'done', closedBy: req.user.name, prescription},
-        {returnDocument: 'after'},
-    );
-    if (!appointment) throw new HttpError(404, 'No active appointment found');
-    res.status(201).json(appointment);
+    res.status(201).json(await appointments.prescribe(req.user, id(req), req.body as PrescribeDto));
 }
 
 export async function listPrescriptions(req: Request, res: Response) {
-    const done = await Appointment.find({...ownedBy(req.user), status: 'done'}).sort('-date');
-    res.json(
-        done.map((a) => ({
-            id: a.id,
-            patientName: a.patientName,
-            doctorName: a.doctorName,
-            date: a.date,
-            disease: a.prescription?.disease,
-            medication: a.prescription?.medication,
-        })),
-    );
+    sendPage(res, await appointments.listPrescriptions(req.user, query(req)));
+}
+
+export async function rate(req: Request, res: Response) {
+    res.json(await appointments.rate(req.user, id(req), (req.body as RateDto).stars));
+}
+
+export async function ratings(_req: Request, res: Response) {
+    res.json(await appointments.ratings());
+}
+
+export async function requestRefill(req: Request, res: Response) {
+    res.json(await appointments.requestRefill(req.user, id(req)));
+}
+
+export async function decideRefill(req: Request, res: Response) {
+    res.json(await appointments.decideRefill(req.user, id(req), (req.body as RefillDecisionDto).approve));
+}
+
+export async function stats(_req: Request, res: Response) {
+    res.json(await appointments.stats());
 }

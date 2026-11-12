@@ -1,6 +1,6 @@
 import {Link} from 'react-router';
 import {Box, Button, Typography} from '@mui/material';
-import gif from '../assets/404.gif';
+import gif from '@/assets/404.gif';
 
 export default function NotFound() {
     return (

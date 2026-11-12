@@ -1,12 +1,12 @@
 import {screen} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {renderWithProviders} from '../../test/render';
-import {http} from '../../api/client';
+import {renderWithProviders} from '@/test/render';
+import {http} from '@/api/client';
 import Login from './Login';
 import Signup from './Signup';
 
-vi.mock('../../api/client', () => ({http: {post: vi.fn()}, setAccessToken: vi.fn()}));
-vi.mock('../../auth/useAuth', () => ({useAuth: () => ({loading: false, profile: null})}));
+vi.mock('@/api/client', () => ({http: {post: vi.fn()}, setAccessToken: vi.fn()}));
+vi.mock('@/auth/useAuth', () => ({useAuth: () => ({loading: false, profile: null})}));
 
 test('login submits credentials and shows server errors', async () => {
     vi.mocked(http.post).mockRejectedValue(new Error('Invalid email or password'));

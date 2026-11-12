@@ -1,10 +1,10 @@
 import {Button, Paper, Stack, TextField, Typography} from '@mui/material';
 import {z} from 'zod';
-import {useCreateDoctor} from '../../api/hooks';
-import useZodForm from '../../useZodForm';
-import FormStatus from '../../components/FormStatus';
+import {useCreateDoctor} from '@/api/hooks';
+import useZodForm from '@/useZodForm';
+import FormStatus from '@/components/FormStatus';
 
-const SPECIALIZATIONS = ['General', 'Cardiologist', 'Gynaecologist', 'Dermatologist', 'Pediatrician', 'Neurologist'];
+export const SPECIALIZATIONS = ['General', 'Cardiologist', 'Gynaecologist', 'Dermatologist', 'Pediatrician', 'Neurologist'];
 
 const schema = z
     .object({

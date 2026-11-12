@@ -1,6 +1,6 @@
 import {Navigate, Outlet} from 'react-router';
 import {CircularProgress} from '@mui/material';
-import type {Role} from '../api/types';
+import type {Role} from '@/api/types';
 import {useAuth} from './useAuth';
 
 const homes: Record<Role, string> = {admin: '/admin/doctors', doctor: '/doctor/appointments', patient: '/patient/book'};

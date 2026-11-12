@@ -7,6 +7,7 @@ let accessToken: string | null = null;
 export const setAccessToken = (token: string | null) => {
     accessToken = token;
 };
+export const getAccessToken = () => accessToken;
 
 /** Signs out locally. Updates the session in place (clear() would orphan mounted observers). */
 export function endSession() {
