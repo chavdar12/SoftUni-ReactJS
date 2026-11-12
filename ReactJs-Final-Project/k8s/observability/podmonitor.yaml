@@ -1,0 +1,14 @@
+# Prometheus scrapes the services' OpenTelemetry metrics (:9464/metrics) from every pod.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: hms-services
+  namespace: hms
+spec:
+  selector:
+    matchExpressions:
+      - {key: app, operator: In, values: [identity, appointments]}
+  podTargetLabels: [app]
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 15s

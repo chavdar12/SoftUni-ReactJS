@@ -1,0 +1,55 @@
+# Prometheus + Grafana + cluster metrics (kube-state-metrics, node-exporter) and Kubernetes dashboards.
+fullnameOverride: kps
+
+alertmanager:
+  enabled: false
+# Control-plane components aren't scrapeable on Docker Desktop/kind; skip them instead of showing them as down.
+kubeEtcd: {enabled: false}
+kubeControllerManager: {enabled: false}
+kubeScheduler: {enabled: false}
+kubeProxy: {enabled: false}
+
+prometheus:
+  prometheusSpec:
+    # Pick up PodMonitors/ServiceMonitors from any namespace, not only ones labelled for this release.
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    enableRemoteWriteReceiver: true  # Tempo writes service-graph and span metrics here
+    retention: 3d
+    resources:
+      requests: {cpu: 100m, memory: 400Mi}
+
+grafana:
+  fullnameOverride: grafana
+  admin:
+    existingSecret: grafana-admin  # created by install.sh
+  service:
+    type: LoadBalancer  # Docker Desktop: http://localhost:3000
+    port: 3000
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+  additionalDataSources:
+    - name: Loki
+      uid: loki
+      type: loki
+      url: http://loki.monitoring:3100
+      jsonData:
+        # Every app log line carries "traceId": make it a link to the trace.
+        derivedFields:
+          - name: traceId
+            matcherRegex: '"traceId":"(\w+)"'
+            datasourceUid: tempo
+            url: "$${__value.raw}"
+    - name: Tempo
+      uid: tempo
+      type: tempo
+      url: http://tempo.monitoring:3200
+      jsonData:
+        serviceMap: {datasourceUid: prometheus}
+        nodeGraph: {enabled: true}
+        tracesToLogsV2:
+          datasourceUid: loki
+          customQuery: true
+          query: '{namespace="hms"} |= "$${__trace.traceId}"'
+          spanStartTimeShift: -5m
+          spanEndTimeShift: 5m

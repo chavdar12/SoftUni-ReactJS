@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+spec:
+  clusterIP: None
+  selector: {app: mongo}
+  ports: [{port: 27017}]
+---
+# shortcut: single node, no replica set; run a 3-member replica set (or a managed Mongo) for real HA.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  serviceName: mongo
+  replicas: 1
+  selector:
+    matchLabels: {app: mongo}
+  template:
+    metadata:
+      labels: {app: mongo}
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: mongo
+          image: mongo:8
+          ports: [{containerPort: 27017}]
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 1Gi}
+          readinessProbe:
+            exec: {command: [mongosh, --quiet, --eval, "db.adminCommand('ping')"]}
+            periodSeconds: 10
+          livenessProbe:
+            exec: {command: [mongosh, --quiet, --eval, "db.adminCommand('ping')"]}
+            periodSeconds: 20
+            timeoutSeconds: 5
+          volumeMounts: [{name: data, mountPath: /data/db}]
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: {storage: 1Gi}

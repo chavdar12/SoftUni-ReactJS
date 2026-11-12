@@ -1,0 +1,106 @@
+# ClusterIP service: service-to-service calls.
+apiVersion: v1
+kind: Service
+metadata:
+  name: appointments
+spec:
+  selector: {app: appointments}
+  ports: [{port: 4000}]
+---
+# Headless service: DNS returns every ready pod, so the gateway balances per pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: appointments-pods
+spec:
+  clusterIP: None
+  selector: {app: appointments}
+  ports: [{port: 4000}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointments
+spec:
+  # No replicas field: the HPA below owns it.
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}  # zero-downtime deploys
+  selector:
+    matchLabels: {app: appointments}
+  template:
+    metadata:
+      labels: {app: appointments}
+    spec:
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: appointments
+          image: hms-appointments:dev
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 4000}, {name: metrics, containerPort: 9464}]
+          env:
+            - {name: MONGO_URL, value: "mongodb://mongo:27017"}
+            - {name: REDIS_URL, value: "redis://redis:6379"}
+            - {name: JWT_SECRET, valueFrom: {secretKeyRef: {name: hms-secrets, key: JWT_SECRET}}}
+            # OpenTelemetry: traces -> Tempo, metrics on :9464/metrics for Prometheus (see k8s/observability).
+            - {name: OTEL_SERVICE_NAME, value: appointments}
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://tempo.monitoring.svc.cluster.local:4318"}
+            - {name: OTEL_TRACES_EXPORTER, value: otlp}
+            - {name: OTEL_METRICS_EXPORTER, value: prometheus}
+            - {name: OTEL_EXPORTER_PROMETHEUS_HOST, value: 0.0.0.0}  # default is localhost: Prometheus couldn't reach it
+            - {name: OTEL_LOGS_EXPORTER, value: none}
+            - {name: OTEL_SEMCONV_STABILITY_OPT_IN, value: http}
+            - {name: IDENTITY_URL, value: "http://identity:4000"}
+          # CPU request is what the HPA percentage is measured against. No CPU limit: throttling hurts latency.
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 256Mi}
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
+          # Liveness only asks "is the process alive?"; a Mongo outage must not restart every pod.
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+          # Readiness drops the pod from DNS/endpoints while draining or disconnected from Mongo.
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+            failureThreshold: 2
+          lifecycle:
+            # Keep serving while the gateway's DNS (valid=5s) and kube-proxy forget this pod, then SIGTERM.
+            preStop:
+              sleep: {seconds: 6}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: appointments
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: appointments}
+  minReplicas: 1
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 60}
+  behavior:
+    scaleUp:  # react to spikes fast: double, or +4 pods, every 15s
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+        - {type: Percent, value: 100, periodSeconds: 15}
+        - {type: Pods, value: 4, periodSeconds: 15}
+    scaleDown:  # shrink slowly so a brief lull doesn't cause flapping
+      stabilizationWindowSeconds: 120
+      policies:
+        - {type: Percent, value: 50, periodSeconds: 60}
