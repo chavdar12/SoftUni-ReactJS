@@ -1,5 +1,5 @@
 import {Redis} from 'ioredis';
-import {config} from '../config.ts';
+import {config} from '#shared/config.ts';
 import {logger} from './logger.ts';
 
 // Fail fast while Redis is down instead of queueing requests until it comes back.

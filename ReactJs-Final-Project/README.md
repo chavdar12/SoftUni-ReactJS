@@ -21,18 +21,41 @@ load/     k6 load test
 
 ```
 server/
-  shared/src/        bootstrap (probes, logging, graceful shutdown), JWT verify, middleware, redis, logger
-  identity/          Dockerfile + src/{index, config, routes, schemas}.ts, models/User, controllers/{auth,users},
-                     lib/{tokens, seedAdmin}
-  appointments/      Dockerfile + src/{index, config, routes, schemas}.ts, models/Appointment,
-                     controllers/appointments, lib/identityClient, middleware/idempotency
+  shared/src/        bootstrap (probes, logging, graceful shutdown), JWT verify, middleware, redis, mailer, logger
+  <service>/src/
+    routes.ts        URL -> validate(zod DTO) -> controller
+    dto/             zod schemas for every input (types inferred from them) + output DTO types and mappers
+    controllers/     HTTP only: read the validated DTO, call a service, send the response (cookies, headers)
+    services/        business rules; no req/res, no Mongoose
+    repositories/    the only code that touches Mongoose models
+    models/, lib/    schemas; helpers (tokens, TOTP, slots, identity client, ...)
 ```
+
+Imports use path aliases: `#shared/*`, `#identity/*`, `#appointments/*` on the server (Node's own `package.json`
+`imports`, so they work at runtime without a build step) and `@/*` for `client/src` (Vite + tsconfig).
 
 Each service has its own image (`hms-identity`, `hms-appointments`) holding only `shared/` and its own
 folder; one `package.json`/lockfile in `server/` keeps dependency versions identical across services.
 They share only the JWT secret (each verifies tokens itself) and talk over
 HTTP: booking asks `identity` for the doctor (`GET /api/doctors/:id`), forwarding the user's token and
 request id; if identity is down, booking returns a 503 "please retry" while reads keep working.
+
+## Demo data
+
+`npm run seed` in `server/` fills both databases with 6 doctors (`maria.ivanova@hms.local` …, password `doctor123`),
+8 patients (`ana@example.com` …, password `patient123`) and 48 appointments in every state (done with prescriptions
+and ratings, cancelled, upcoming, one pending refill) plus a few notes. It skips the insert if the demo data is already there.
+Against the cluster: `kubectl -n hms port-forward svc/mongo 27017` in another terminal first.
+
+Emails (reset links, reminders, verification and sign-in codes) and mock SMS go to MailDev, a test inbox:
+`kubectl -n hms port-forward svc/maildev 1080` and open http://localhost:1080. For `npm run dev:*`, run
+`docker run -d -p 1080:1080 -p 1025:1025 maildev/maildev:3.0.0` and set `SMTP_URL=smtp://localhost:1025` (in `.env.example`).
+
+## Account security
+
+My account → Security: verify email and phone (6-digit codes; SMS is mocked into MailDev), one authenticator app
+(TOTP, secret encrypted at rest), optional email codes at sign-in, and any number of passkeys (up to 10), which also
+sign in without a password. Passkeys are bound to `RP_ID`/`APP_URL` (default `localhost` / `http://localhost:8080`).
 
 ## Run (Kubernetes)
 

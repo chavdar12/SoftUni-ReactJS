@@ -88,19 +88,26 @@ server {
         return 200 "ok\n";
     }
 
-    location ~ ^/api/auth/(login|signup)$ {
+    location ~ ^/api/auth/(login|signup|forgot|reset|mfa|mfa/email|passkey|passkey/options)$ {
         limit_req zone=auth burst=20 nodelay;
         error_page 502 504 = @identity_fallback;
         proxy_pass http://identity;
     }
 
-    location ~ ^/api/(auth|doctors|patients)(/|$) {
+    location ~ ^/api/(auth|me|doctors|patients)(/|$) {
         limit_req zone=api burst=40 nodelay;
         error_page 502 504 = @identity_fallback;
         proxy_pass http://identity;
     }
 
-    location ~ ^/api/(appointments|prescriptions)(/|$) {
+    # Live updates: a long-lived Server-Sent Events stream (the service sends a heartbeat every 20s).
+    location = /api/events {
+        proxy_buffering off;
+        proxy_read_timeout 1h;
+        proxy_pass http://appointments;
+    }
+
+    location ~ ^/api/(appointments|prescriptions|ratings|stats|history|notes)(/|$) {
         limit_req zone=api burst=40 nodelay;
         error_page 502 504 = @appointments_fallback;
         proxy_pass http://appointments;

@@ -41,6 +41,7 @@ jobs:
           cache-dependency-path: ReactJs-Final-Project/server/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
 
   e2e:
     needs: [client, server]

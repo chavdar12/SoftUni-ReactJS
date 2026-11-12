@@ -3,12 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "imports": {
+    "#shared/*": "./shared/src/*",
+    "#identity/*": "./identity/src/*",
+    "#appointments/*": "./appointments/src/*"
+  },
   "scripts": {
     "dev:identity": "SERVICE=identity node --watch --env-file-if-exists=../.env identity/src/index.ts",
     "dev:appointments": "SERVICE=appointments PORT=4001 node --watch --env-file-if-exists=../.env appointments/src/index.ts",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "JWT_SECRET=test node --test --experimental-test-module-mocks 'shared/**/*.test.ts' 'identity/**/*.test.ts' 'appointments/**/*.test.ts'",
+    "seed": "node --env-file-if-exists=../.env seed/demo.ts"
   },
   "dependencies": {
+    "@date-fns/tz": "^1.5.0",
     "@opentelemetry/api": "^1.10.0",
     "@opentelemetry/instrumentation-express": "^0.73.0",
     "@opentelemetry/instrumentation-http": "^0.301.1",
@@ -16,12 +24,15 @@
     "@opentelemetry/instrumentation-mongoose": "^0.71.0",
     "@opentelemetry/instrumentation-undici": "^0.35.0",
     "@opentelemetry/sdk-node": "^0.301.1",
+    "@simplewebauthn/server": "^14.0.3",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
+    "date-fns": "^4.4.0",
     "express": "^5.3.0",
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.12.1",
+    "nodemailer": "^10.2.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

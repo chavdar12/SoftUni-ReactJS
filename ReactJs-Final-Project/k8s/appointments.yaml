@@ -54,6 +54,7 @@ spec:
             - {name: OTEL_LOGS_EXPORTER, value: none}
             - {name: OTEL_SEMCONV_STABILITY_OPT_IN, value: http}
             - {name: IDENTITY_URL, value: "http://identity:4000"}
+            - {name: SMTP_URL, value: "smtp://maildev:1025"}  # test inbox; point at a real SMTP server in production
           # CPU request is what the HPA percentage is measured against. No CPU limit: throttling hurts latency.
           resources:
             requests: {cpu: 100m, memory: 128Mi}

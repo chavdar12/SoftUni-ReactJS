@@ -1,7 +1,8 @@
-import type {Column} from '../components/DataTable';
-import type {Appointment, Prescription, User} from '../api/types';
+import type {Column} from '@/components/DataTable';
+import {formatDateTime} from '@/lib/dates';
+import type {Appointment, Prescription, User} from '@/api/types';
 
-const dateTime = (d: unknown) => (d ? new Date(d as string).toLocaleString() : '');
+export const dateTime = (d: unknown) => (d ? formatDateTime(d as string) : '');
 
 export const doctorColumns: Column<User>[] = [
     {id: 'name', label: 'Name'},
@@ -22,7 +23,8 @@ export const appointmentColumns: Column<Appointment>[] = [
     {id: 'specialization', label: 'Specialization'},
     {id: 'roomNumber', label: 'Room'},
     {id: 'date', label: 'Date', format: dateTime},
-    {id: 'status', label: 'Status'},
+    {id: 'reason', label: 'Reason'},
+    {id: 'status', label: 'Status', format: (s, a) => (a.cancelReason ? `${s} (${a.cancelReason})` : (s as string))},
 ];
 
 export const prescriptionColumns: Column<Prescription>[] = [
@@ -31,4 +33,5 @@ export const prescriptionColumns: Column<Prescription>[] = [
     {id: 'date', label: 'Date', format: dateTime},
     {id: 'disease', label: 'Diagnosis'},
     {id: 'medication', label: 'Medication'},
+    {id: 'refillStatus', label: 'Refill'},
 ];

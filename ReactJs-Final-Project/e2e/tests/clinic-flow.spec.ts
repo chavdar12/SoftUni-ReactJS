@@ -11,7 +11,7 @@ async function signIn(page: Page, email: string, password: string) {
     await page.goto('/login');
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);
-    await page.getByRole('button', {name: 'Sign in'}).click();
+    await page.getByRole('button', {name: 'Sign in', exact: true}).click();
 }
 
 async function signOut(page: Page) {
@@ -48,7 +48,10 @@ test('patient signs up, books, and the session survives a reload', async ({page}
 
     await page.getByLabel('Specialization').selectOption('Neurologist');
     await page.getByLabel('Doctor').selectOption({label: `${doctor.name} (room 7)`});
-    await page.getByLabel('Date and time').fill('2030-01-15T09:30');
+    await page.getByRole('textbox', {name: 'Date', exact: true}).fill('2030-01-15'); // a Tuesday: within default hours
+    const time = page.getByLabel('Time');
+    await expect(time).toBeEnabled();
+    await time.selectOption((await time.locator('option:not([disabled])').first().getAttribute('value'))!);
     await page.getByRole('button', {name: 'Book appointment'}).click();
     await expect(page.getByText('Appointment booked.')).toBeVisible();
 
@@ -67,6 +70,8 @@ test('doctor prescribes and the patient sees it', async ({page}) => {
     await page.getByLabel('Diagnosis').fill('Migraine');
     await page.getByLabel('Medication').fill('Rest, water');
     await page.getByRole('button', {name: 'Prescribe'}).click();
+    // Done appointments leave the default "Upcoming" tab.
+    await page.getByRole('tab', {name: 'All'}).click();
     await expect(page.getByRole('row', {name: new RegExp(patient.name)})).toContainText('done');
     await signOut(page);
 

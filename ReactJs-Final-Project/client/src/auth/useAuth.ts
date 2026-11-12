@@ -1,4 +1,4 @@
-import {useSession} from '../api/hooks';
+import {useSession} from '@/api/hooks';
 
 /** { loading, profile } where profile is the signed-in user or null. */
 export function useAuth() {

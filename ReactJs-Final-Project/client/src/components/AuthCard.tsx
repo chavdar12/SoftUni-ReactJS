@@ -1,6 +1,6 @@
 import type {ReactNode} from 'react';
 import {Box, Paper, Typography} from '@mui/material';
-import bg from '../assets/bg-4.jpg';
+import bg from '@/assets/bg-4.jpg';
 
 /** Centered card over the background image, used by the login/signup pages. */
 export default function AuthCard({title, children}: {title: string; children: ReactNode}) {

@@ -1,6 +1,6 @@
 import type {NextFunction, Request, Response} from 'express';
-import {HttpError} from '../lib/HttpError.ts';
-import {type AuthUser, type Role, verifyAccessToken} from '../lib/jwt.ts';
+import {HttpError} from '#shared/lib/HttpError.ts';
+import {type AuthUser, type Role, verifyAccessToken} from '#shared/lib/jwt.ts';
 
 declare global {
     namespace Express {
