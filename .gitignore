@@ -1,12 +1,23 @@
+# deps & builds
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
+.vite/
+
+# secrets: only the example is committed
 .env
 .env.*
 !.env.example
-.DS_Store
-.idea/
-.vscode/
-*.log
+
+# test output (Playwright, vitest, k6)
 test-results/
 playwright-report/
+blob-report/
+e2e/.auth/
+
+# editors / OS / logs
+.idea/
+.vscode/
+.DS_Store
+*.log
