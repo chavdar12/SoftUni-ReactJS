@@ -1,0 +1,137 @@
+# Rendered by the nginx image's envsubst at start: ${RESOLVER}, ${IDENTITY_HOST}, ${APPOINTMENTS_HOST}, ${OTEL_ENDPOINT}.
+
+log_format json escape=json '{"time":"$time_iso8601","level":"info","msg":"request","service":"gateway",'
+    '"reqId":"$request_id","traceId":"$otel_trace_id","remote":"$remote_addr","method":"$request_method","path":"$request_uri",'
+    '"status":$status,"seconds":$request_time,"upstream":"$upstream_addr","upstreamStatus":"$upstream_status",'
+    '"upstreamSeconds":"$upstream_response_time","bytes":$body_bytes_sent}';
+# Tracing: each /api request starts a trace here; `traceparent` carries it into the services.
+otel_exporter {
+    endpoint ${OTEL_ENDPOINT};
+}
+otel_service_name gateway;
+
+# Re-resolve service names every 5s, so pods the autoscaler adds (or kills) join (or leave) the pool.
+resolver ${RESOLVER} valid=5s ipv6=off;
+
+# Per-client-IP limits: general API traffic, and a strict one for credential endpoints (brute force).
+# shortcut: counters are per gateway pod, so N gateway replicas allow N x the rate; use a shared limiter (Redis) if that matters.
+limit_req_zone $binary_remote_addr zone=api:10m rate=20r/s;
+limit_req_zone $binary_remote_addr zone=auth:10m rate=10r/m;
+limit_req_status 429;
+limit_req_log_level warn;  # a 429 is expected behaviour, not an error
+
+# Each upstream host is a headless service/DNS name returning one IP per ready pod;
+# least_conn sends each request to the least busy pod.
+upstream identity {
+    zone identity 64k;
+    least_conn;
+    server ${IDENTITY_HOST}:4000 resolve max_fails=2 fail_timeout=5s;
+    keepalive 32;
+}
+
+upstream appointments {
+    zone appointments 64k;
+    least_conn;
+    server ${APPOINTMENTS_HOST}:4000 resolve max_fails=2 fail_timeout=5s;
+    keepalive 32;
+}
+
+# Fallback via the ClusterIP services (kube-proxy picks a ready pod). Needed because nginx refuses
+# to retry within a `resolve` group whose pod list changed mid-request, which is exactly what a crash does.
+upstream identity_svc {
+    server identity:4000;
+}
+
+upstream appointments_svc {
+    server appointments:4000;
+}
+
+server {
+    listen 80;
+    # Declared here so it replaces (not adds to) the image's default text access log.
+    access_log /var/log/nginx/access.log json;
+    server_tokens off;
+    client_max_body_size 100k;
+    root /usr/share/nginx/html;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Request-ID $request_id;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 1s;  # in-cluster connects take <1ms; fail over to another pod fast
+    proxy_read_timeout 30s;
+    # A pod that dies mid-request: retry on another pod (nginx never retries POST/PATCH by default).
+    proxy_next_upstream error timeout http_502 http_503;
+    proxy_next_upstream_tries 3;
+    add_header X-Request-ID $request_id always;
+    otel_trace on;
+    otel_trace_context propagate;
+
+    # No pod could answer: tell the client to retry instead of showing nginx's HTML error page.
+    error_page 502 503 504 = @unavailable;
+    recursive_error_pages on;  # lets a failed fallback below end up in @unavailable
+    location @unavailable {
+        default_type application/json;
+        add_header Retry-After 5 always;
+        add_header X-Request-ID $request_id always;
+    otel_trace on;
+    otel_trace_context propagate;
+        return 503 '{"error":"Service temporarily unavailable, please retry"}';
+    }
+
+    location = /healthz {
+        access_log off;
+        otel_trace off;
+        return 200 "ok\n";
+    }
+
+    location ~ ^/api/auth/(login|signup)$ {
+        limit_req zone=auth burst=20 nodelay;
+        error_page 502 504 = @identity_fallback;
+        proxy_pass http://identity;
+    }
+
+    location ~ ^/api/(auth|doctors|patients)(/|$) {
+        limit_req zone=api burst=40 nodelay;
+        error_page 502 504 = @identity_fallback;
+        proxy_pass http://identity;
+    }
+
+    location ~ ^/api/(appointments|prescriptions)(/|$) {
+        limit_req zone=api burst=40 nodelay;
+        error_page 502 504 = @appointments_fallback;
+        proxy_pass http://appointments;
+    }
+
+    # One last try for reads only; a POST/PATCH may already have run, so it gets the 503 instead.
+    location @identity_fallback {
+        if ($request_method !~ ^(GET|HEAD)$) { return 503; }
+        proxy_pass http://identity_svc;
+    }
+
+    location @appointments_fallback {
+        if ($request_method !~ ^(GET|HEAD)$) { return 503; }
+        proxy_pass http://appointments_svc;
+    }
+
+    location /api/ {
+        default_type application/json;
+        return 404 '{"error":"Not found"}';
+    }
+
+    location /assets/ {
+        access_log off;
+        otel_trace off;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location / {
+        access_log off;
+        otel_trace off;
+        try_files $uri /index.html;
+    }
+}

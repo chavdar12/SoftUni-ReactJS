@@ -11,19 +11,74 @@ defaults:
     working-directory: ReactJs-Final-Project
 
 jobs:
-  test-and-build:
+  client:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ReactJs-Final-Project/client
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: ReactJs-Final-Project/package-lock.json
+          cache-dependency-path: ReactJs-Final-Project/client/package-lock.json
       - run: npm ci
       - run: npm test -- --run
       - run: npm run build
-      - uses: actions/upload-artifact@v4
+
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ReactJs-Final-Project/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          name: dist
-          path: ReactJs-Final-Project/dist
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ReactJs-Final-Project/server/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+
+  e2e:
+    needs: [client, server]
+    runs-on: ubuntu-latest
+    env:
+      ADMIN_EMAIL: admin@hms.local
+      ADMIN_PASSWORD: ci-admin-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: hms
+      - name: Build images into the cluster
+        run: |
+          docker build -t hms-identity:dev -f server/identity/Dockerfile server
+          docker build -t hms-appointments:dev -f server/appointments/Dockerfile server
+          docker build -t hms-gateway:dev -f nginx/Dockerfile .
+          kind load docker-image hms-identity:dev hms-appointments:dev hms-gateway:dev --name hms
+      - name: Deploy
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl -n hms create secret generic hms-secrets --from-literal=JWT_SECRET=ci-${{ github.run_id }}-$RANDOM \
+            --from-literal=ADMIN_EMAIL="$ADMIN_EMAIL" --from-literal=ADMIN_PASSWORD="$ADMIN_PASSWORD"
+          kubectl apply -k k8s/
+          kubectl -n hms wait --for=condition=available deploy --all --timeout=300s
+          kubectl -n hms port-forward svc/gateway 8080:8080 &
+          sleep 3
+      - run: npm ci && npx playwright install --with-deps chromium && npx playwright test
+        working-directory: ReactJs-Final-Project/e2e
+      - name: Load test
+        run: |
+          kubectl -n hms run k6 --rm -i --restart=Never --image=grafana/k6:1.4.0 \
+            --env BASE_URL=http://gateway:8080 --env ADMIN_EMAIL="$ADMIN_EMAIL" --env ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+            -- run - < load/api.js
+      - if: failure()
+        run: |
+          kubectl -n hms get pods -o wide
+          kubectl -n hms logs -l 'app in (identity,appointments,gateway)' --tail=100 --prefix

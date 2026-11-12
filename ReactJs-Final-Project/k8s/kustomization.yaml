@@ -1,0 +1,9 @@
+# kubectl apply -k k8s/   (create the hms-secrets secret first, see README)
+namespace: hms
+resources:
+  - namespace.yaml
+  - mongo.yaml
+  - redis.yaml
+  - identity.yaml
+  - appointments.yaml
+  - gateway.yaml

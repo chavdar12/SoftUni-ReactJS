@@ -1,0 +1,11 @@
+# kubectl apply -k k8s/observability   (after the Helm charts in install.sh)
+resources:
+  - podmonitor.yaml
+configMapGenerator:
+  # Grafana's sidecar loads any ConfigMap with this label as a dashboard.
+  - name: hms-dashboards
+    namespace: monitoring
+    files: [hms-overview.json]
+    options:
+      labels: {grafana_dashboard: "1"}
+      disableNameSuffixHash: true

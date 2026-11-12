@@ -1,0 +1,16 @@
+# Tempo single binary: receives OTLP traces from the gateway (gRPC :4317) and services (HTTP :4318).
+tempo:
+  retention: 72h
+  resources:
+    requests: {cpu: 50m, memory: 256Mi}
+  # Derive request/error/latency metrics and the service graph from spans, written to Prometheus.
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: http://kps-prometheus.monitoring:9090/api/v1/write
+  overrides:
+    defaults:
+      metrics_generator:
+        processors: [service-graphs, span-metrics]
+persistence:
+  enabled: true
+  size: 2Gi
